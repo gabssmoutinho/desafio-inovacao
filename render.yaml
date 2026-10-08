@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: desafio-inovacao
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
