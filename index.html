@@ -1,0 +1,75 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desafio da Inovação</title><script src="/socket.io/socket.io.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial;background:linear-gradient(135deg,#0b1422,#173b52,#205d5b);color:#fff;min-height:100vh}
+main{max-width:1080px;margin:auto;padding:20px}.card{background:#ffffff12;border:1px solid #ffffff20;border-radius:22px;padding:22px;box-shadow:0 15px 45px #0004;margin:12px 0}
+h1{font-size:clamp(36px,7vw,62px);line-height:.98;margin:8px 0}h2{margin:6px 0 12px}.muted{color:#c7d5e0;line-height:1.5}.pill{display:inline-block;background:#ffffff12;border-radius:999px;padding:8px 12px;margin:3px;font-weight:800}
+button{border:0;border-radius:12px;padding:12px 17px;font-weight:850;font-size:15px;cursor:pointer;margin:4px;background:#fff;color:#102033}button.primary{background:#63e6c6}button.warn{background:#ffd166}button.danger{background:#ff8989}
+input,textarea{width:100%;padding:13px;border-radius:12px;border:1px solid #ffffff28;background:#071321aa;color:#fff;font:inherit;margin:6px 0 12px}textarea{min-height:145px;resize:vertical}
+.row,.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.hidden{display:none!important}.players{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px}
+.player{padding:12px;background:#ffffff0b;border-radius:14px;display:flex;gap:10px;align-items:center}.avatar{font-size:28px}.score{margin-left:auto;font-weight:950;color:#63e6c6}
+.big-code{text-align:center;font-size:48px;letter-spacing:9px;font-weight:1000;color:#63e6c6;padding:8px}.timer{font-size:30px;font-weight:1000;color:#63e6c6}
+.strategies{display:flex;flex-wrap:wrap;gap:8px}.strategy{background:#ffffff0c;border:1px solid #ffffff1c;color:#fff}.strategy.selected{background:#63e6c626;border-color:#63e6c6}
+.controls{display:flex;flex-wrap:wrap;gap:6px;background:#0003;border-radius:16px;padding:10px;margin:12px 0}.teacher{border-left:4px solid #ffd166}
+.rank{display:flex;justify-content:space-between;padding:13px;border-bottom:1px solid #ffffff16}.rank.me{background:#63e6c612;border-radius:10px}.rank.top{font-size:19px}
+.toast{position:fixed;right:14px;bottom:14px;background:#102033;padding:14px 17px;border-radius:13px;border:1px solid #ffffff22;display:none}
+.modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}.modal .card{max-width:500px;width:100%;text-align:center}.qr{max-width:300px;width:100%;background:white;padding:12px;border-radius:12px}
+.badge{font-size:13px;color:#8df1da;text-transform:uppercase;letter-spacing:1px;font-weight:900}
+@media(max-width:700px){.row,.grid2{grid-template-columns:1fr}.card{padding:17px}.big-code{font-size:38px;letter-spacing:6px}}
+</style></head><body><main>
+
+<section id="login" class="card"><div class="badge">Jogo de sala • multiplayer</div><h1>Desafio da<br>Inovação 💡</h1>
+<p class="muted">Crie uma partida para a turma ou entre com o código. O jogo sincroniza jogadores, pontuação, rodadas e ranking em tempo real.</p>
+<div class="row"><div><h3>👨‍🏫 Criar partida</h3><input id="createName" maxlength="18" placeholder="Nome do professor/anfitrião"><button class="primary" onclick="createRoom()">Criar sala</button></div>
+<div><h3>👤 Entrar na partida</h3><input id="joinName" maxlength="18" placeholder="Seu nome"><input id="roomCode" maxlength="6" placeholder="Código"><button onclick="joinRoom()">Entrar</button></div></div>
+<p id="error" class="muted"></p></section>
+
+<section id="lobby" class="hidden"><div class="card"><div class="badge">Sala privada</div><div class="big-code" id="code"></div><p class="muted" style="text-align:center">Compartilhe o código ou use o QR Code.</p>
+<div class="controls"><button id="qrBtn" class="primary hidden" onclick="showQR()">📱 QR Code</button><button id="copyBtn" onclick="copyJoin()">🔗 Copiar link</button><button id="projBtn" class="hidden" onclick="projectionMode()">📺 Projeção</button></div>
+<h2>Jogadores conectados</h2><div id="players" class="players"></div><div class="controls"><button id="start" class="primary hidden" onclick="startGame()">▶️ Iniciar partida</button></div></div></section>
+
+<section id="game" class="hidden"><div class="card"><span class="pill" id="round"></span><span class="pill">Sala: <b id="gameCode"></b></span><span class="pill">⏱️ <span class="timer" id="timer">60</span>s</span>
+<div id="teacherControls" class="controls teacher hidden"><b style="width:100%">👨‍🏫 Painel do professor</b><button id="pauseBtn" class="warn" onclick="togglePause()">⏸️ Pausar</button><button class="warn" onclick="teacherNext()">⏭️ Próxima rodada</button><button class="danger" onclick="teacherFinish()">🏁 Encerrar</button><button onclick="projectionMode()">📺 Projeção</button></div>
+<h2 id="title"></h2><p class="muted" id="scenario"></p><p><b>🎯 Desafio:</b> <span id="question"></span></p><h3>Escolha estratégias</h3><div id="strategies" class="strategies"></div>
+<h3>💡 Sua solução</h3><textarea id="answer" placeholder="Explique a ideia e, principalmente, COMO ela funcionaria..."></textarea><button class="primary" onclick="submitAnswer()">Enviar solução 🚀</button><p id="submitted" class="muted hidden">✅ Solução enviada. Aguarde os demais jogadores.</p></div>
+<div class="card"><h2>🏆 Ranking ao vivo</h2><div id="liveRanking"></div></div></section>
+
+<section id="results" class="hidden"><div class="card"><div class="badge">Partida encerrada</div><h1>🏁 Resultado</h1><div id="finalRanking"></div><button class="primary" onclick="location.reload()">Nova partida</button></div></section>
+
+<section id="projection" class="hidden"><div class="card"><div class="badge">Tela de projeção</div><h1 id="projTitle">🏆 Ranking ao vivo</h1><div class="big-code" id="projCode"></div><p id="projRound" class="muted" style="text-align:center"></p><div id="projTimer" class="timer" style="text-align:center"></div><div id="projRanking"></div></div></section>
+
+<div id="qrModal" class="modal hidden"><div class="card"><h2>📱 Entre pelo QR Code</h2><img id="qrImage" class="qr"><p class="muted">Cada aluno aponta a câmera para o código e depois informa o nome.</p><button onclick="closeQR()">Fechar</button></div></div>
+</main><div id="toast" class="toast"></div>
+
+<script>
+const socket=io();let state=null,host=false,token=localStorage.getItem("dio_token"),room=new URLSearchParams(location.search).get("room")||"",submitted=false,endAt=null,paused=false,tick=null;
+const $=id=>document.getElementById(id);
+function show(id){["login","lobby","game","results","projection"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
+function err(t){$("error").textContent=t}
+function createRoom(){socket.emit("createRoom",{name:$("createName").value},r=>{if(!r.ok)return err(r.error);token=r.token;localStorage.setItem("dio_token",token);host=true;room=r.code;history.replaceState(null,"","/?room="+room);show("lobby")})}
+function joinRoom(){const c=$("roomCode").value.trim().toUpperCase();socket.emit("joinRoom",{name:$("joinName").value,code:c,token},r=>{if(!r.ok)return err(r.error);token=r.token;localStorage.setItem("dio_token",token);host=!!r.isHost;room=r.code;history.replaceState(null,"","/?room="+room);show("lobby")})}
+function autoJoin(){if(room&&token)socket.emit("joinRoom",{name:localStorage.getItem("dio_name")||"Jogador",code:room,token},r=>{if(r.ok){host=!!r.isHost;show("lobby")}})}
+function startGame(){socket.emit("startGame")}function teacherNext(){socket.emit("teacherNext")}function teacherFinish(){if(confirm("Encerrar a partida agora?"))socket.emit("teacherFinish")}
+function togglePause(){socket.emit(paused?"resume":"pause")}
+function projectionMode(){show("projection");renderProjection()}
+function copyJoin(){navigator.clipboard?.writeText(location.origin+"/?room="+room);toast("Link copiado!")}
+async function showQR(){const r=await fetch("/api/qr/"+room);const j=await r.json();$("qrImage").src=j.dataUrl;$("qrModal").classList.remove("hidden")}
+function closeQR(){$("qrModal").classList.add("hidden")}
+function renderPlayers(ps,hid){$("players").innerHTML=ps.map(p=>`<div class="player"><span class="avatar">${p.avatar}</span><span>${esc(p.name)} ${p.id===hid?"👑":""}${p.connected===false?"<small> • offline</small>":""}</span><span class="score">${p.score}</span></div>`).join("");$("start").classList.toggle("hidden",socket.id!==hid);$("qrBtn").classList.toggle("hidden",socket.id!==hid);$("projBtn").classList.toggle("hidden",socket.id!==hid)}
+function renderRanking(ps,id="liveRanking"){$(id).innerHTML=ps.map((p,i)=>`<div class="rank ${p.id===socket.id?"me ":""}${i<3?"top":""}"><span><b>${i+1}º</b> ${p.avatar} ${esc(p.name)}</span><b>${p.score} pts</b></div>`).join("")}
+function renderProjection(){if(!state)return;$("projCode").textContent=state.code;$("projRound").textContent=state.status==="playing"?`Rodada ${state.round+1}/${state.totalRounds} • ${state.challenge?.category||""}`:(state.status==="finished"?"Partida encerrada":"Aguardando próxima rodada");renderRanking(state.players,"projRanking");updateProjTimer()}
+socket.on("state",s=>{state=s;$("code").textContent=s.code;$("gameCode").textContent=s.code;renderPlayers(s.players,s.hostId);renderRanking(s.players);paused=s.status==="paused";
+if(s.status==="lobby"){show("lobby");return}
+if(s.status==="playing"||s.status==="paused"){if(document.getElementById("projection").classList.contains("hidden")===false)return;show("game");$("teacherControls").classList.toggle("hidden",socket.id!==s.hostId);$("pauseBtn").textContent=s.status==="paused"?"▶️ Continuar":"⏸️ Pausar";submitted=s.players.find(p=>p.id===socket.id)?.submitted||false;$("submitted").classList.toggle("hidden",!submitted);const c=s.challenge;$("round").textContent=`Rodada ${s.round+1} de ${s.totalRounds}`;$("title").textContent=c.title;$("scenario").textContent=c.scenario;$("question").textContent=c.question;$("strategies").innerHTML=c.strategies.map(x=>`<button class="strategy" onclick="this.classList.toggle('selected')">${esc(x)}</button>`).join("");endAt=s.endsAt;clearInterval(tick);tick=setInterval(updateTimer,250);updateTimer()}
+else if(s.status==="roundEnded"){if(!document.getElementById("projection").classList.contains("hidden"))renderProjection();else{show("game");$("teacherControls").classList.remove("hidden");toast("Rodada encerrada. O professor pode liberar a próxima.")}}
+else if(s.status==="finished"){show("results");$("finalRanking").innerHTML=s.players.map((p,i)=>`<div class="rank ${p.id===socket.id?"me":""}"><span><b>${i+1}º</b> ${p.avatar} ${esc(p.name)}</span><b>${p.score} pts</b></div>`).join("")}});
+socket.on("point",p=>toast(`${p.avatar} ${p.name} +${p.roundScore} pontos!`));
+socket.on("kicked",()=>{localStorage.removeItem("dio_token");alert("Você foi removido da sala.");location.href="/"});
+socket.on("connect",()=>{if(room&&token)autoJoin()});
+function updateTimer(){let n;if(paused)n=Math.ceil((state?.pausedRemaining||0)/1000);else n=endAt?Math.max(0,Math.ceil((endAt-Date.now())/1000)):0;$("timer").textContent=n;if(document.getElementById("projection").classList.contains("hidden")===false)$("projTimer").textContent=n+"s"}
+function updateProjTimer(){updateTimer()}
+function submitAnswer(){if(submitted)return;const a=$("answer").value.trim();if(a.length<20)return toast("Escreva uma solução mais completa.");const strategies=[...document.querySelectorAll(".strategy.selected")].map(x=>x.textContent);socket.emit("submitAnswer",{answer:a,strategies},r=>{if(!r.ok)return toast(r.error);submitted=true;$("submitted").classList.remove("hidden");localStorage.setItem("dio_name",$("joinName").value||"Jogador");toast(`+${r.roundScore} pontos!`)})}
+function toast(t){$("toast").textContent=t;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2500)}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+if(room&&!token){$("roomCode").value=room}
+</script></body></html>
